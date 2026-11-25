@@ -206,8 +206,20 @@ await Promise.race([browser.close(), sleep(15000)]);
 const ok = Object.values(shots).filter((s) => s.ok).length;
 console.log(`done: ${ok}/${Object.keys(shots).length} ok`);
 
+// ---- 画像を縮小してページに埋め込む（iPhone でも追加のログインやクッキーなしで表示できるように） ----
+const sharp = (await import("sharp")).default;
+const thumbs = {};
+for (const [k, s] of Object.entries(shots)) {
+  if (!s.ok) continue;
+  try {
+    const buf = await sharp(`${OUT}/${k}.jpg`).rotate().resize({ width: 560, withoutEnlargement: true }).jpeg({ quality: 62, mozjpeg: true }).toBuffer();
+    thumbs[k] = "data:image/jpeg;base64," + buf.toString("base64");
+  } catch (e) { s.ok = false; s.error = "縮小失敗: " + short(e); }
+}
+const BASEURL = BUCKET ? `https://storage.cloud.google.com/${BUCKET}/` : "";
+
 // ---- 閲覧ページ（自分用） ----
-function viewer(slot, base, slots) {
+function viewer(slot, slots) {
   const byRid = {};
   for (const [key, m] of Object.entries(meta)) (byRid[m.rid] ||= []).push(key);
   let body = "", lastPref = "", lastArea = "";
@@ -219,12 +231,12 @@ function viewer(slot, base, slots) {
     body += `<section><h4>${esc(r.name)}</h4><div class="g">`;
     for (const k of keys) {
       const m = meta[k], s = shots[k];
-      const img = s && s.ok ? `<img loading="lazy" src="${base}${k}.jpg" alt="">` : `<div class="ng">撮影できませんでした</div>`;
+      const img = s && s.ok && thumbs[k] ? `<img src="${thumbs[k]}" alt="">` : `<div class="ng">撮影できませんでした</div>`;
       body += `<a class="t" href="${esc(m.link)}" target="_blank" rel="noopener">${img}<span>${esc(m.label)}</span></a>`;
     }
     body += `</div></section>`;
   }
-  const nav = slots.map((s) => s === slot ? `<b>${slotLabel(s)}</b>` : `<a href="${base === "" ? "../" + s + "/" : "archive/" + s + "/"}index.html">${slotLabel(s)}</a>`).join(" ");
+  const nav = (BASEURL ? `<a href="${BASEURL}index.html">最新</a> ` : "") + slots.map((s) => s === slot ? `<b>${slotLabel(s)}</b>` : `<a href="${BASEURL}archive/${s}/index.html">${slotLabel(s)}</a>`).join(" ");
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>ユキヨミ 撮影画像（自分用）</title><style>
 body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;background:#f4f7fb;color:#123}
@@ -238,13 +250,13 @@ section{background:#fff;border-radius:10px;padding:8px 10px;margin:8px 0;box-sha
 .t{display:block;text-decoration:none;color:#123;font-size:12px}.t img,.ng{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:6px;background:#dfe6ee;display:block}
 .ng{display:flex;align-items:center;justify-content:center;color:#789}.t span{display:block;margin-top:3px}
 footer{font-size:11px;color:#678;padding:0 14px 30px}
-</style></head><body><header><b>ユキヨミ 撮影画像（自分用）</b><small>${slotLabel(slot)} 撮影 ・ ${ok} 枚 ・ 画像をタップするとライブカメラを開きます</small></header>
+</style></head><body><header><b>ユキヨミ 撮影画像（自分用）</b><small>${slotLabel(slot)} 撮影 ・ ${Object.keys(thumbs).length} 枚 ・ 画像をタップするとライブカメラを開きます</small></header>
 <nav>${nav}</nav><main>${body}</main><footer>各カメラの画像の権利は配信元にあります。このページは私的な閲覧専用で、公開していません。</footer></body></html>`;
 }
 
 if (!BUCKET) {
   await writeFile(`${OUT}/index.json`, JSON.stringify({ slot: SLOT, generatedAt: now(), shots }, null, 2), "utf8");
-  await writeFile(`${OUT}/index.html`, viewer(SLOT, "", [SLOT]), "utf8");
+  await writeFile(`${OUT}/index.html`, viewer(SLOT, [SLOT]), "utf8");
   process.exit(ok === 0 ? 1 : 0);
 }
 
@@ -267,7 +279,7 @@ let slots = (apiResp.prefixes || []).map((p) => p.split("/")[1]).filter((s) => /
 slots = [...new Set([...slots, SLOT])].filter((s) => Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8)) >= cutoff - 86400e3).sort().reverse();
 const put = (name, text, type) => bucket.file(name).save(text, { contentType: type, metadata: { cacheControl: NOCACHE }, resumable: false });
 await put(`archive/${SLOT}/index.json`, JSON.stringify({ slot: SLOT, generatedAt: now(), shots }, null, 2), "application/json; charset=utf-8");
-await put(`archive/${SLOT}/index.html`, viewer(SLOT, "", slots), "text/html; charset=utf-8");
-await put(`index.html`, viewer(SLOT, `archive/${SLOT}/`, slots), "text/html; charset=utf-8");
+await put(`archive/${SLOT}/index.html`, viewer(SLOT, slots), "text/html; charset=utf-8");
+await put(`index.html`, viewer(SLOT, slots), "text/html; charset=utf-8");
 console.log(`uploaded ${files.length} images to gs://${BUCKET}/archive/${SLOT}/`);
 process.exit(ok === 0 ? 1 : 0);
