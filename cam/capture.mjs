@@ -273,9 +273,9 @@ await Promise.all(Array.from({ length: 8 }, async () => {
   }
 }));
 // 残っている撮影枠（新しい順）。古いものはバケットの自動削除ルールでも消える
-const [, , apiResp] = await bucket.getFiles({ prefix: "archive/", delimiter: "/", autoPaginate: false });
+const [listed] = await bucket.getFiles({ prefix: "archive/", matchGlob: "archive/*/index.json" });
 const cutoff = Date.now() + 9 * 3600e3 - KEEP_DAYS * 86400e3;
-let slots = (apiResp.prefixes || []).map((p) => p.split("/")[1]).filter((s) => /^\d{8}-\d{4}$/.test(s));
+let slots = listed.map((f) => f.name.split("/")[1]).filter((s) => /^\d{8}-\d{4}$/.test(s));
 slots = [...new Set([...slots, SLOT])].filter((s) => Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8)) >= cutoff - 86400e3).sort().reverse();
 const put = (name, text, type) => bucket.file(name).save(text, { contentType: type, metadata: { cacheControl: NOCACHE }, resumable: false });
 await put(`archive/${SLOT}/index.json`, JSON.stringify({ slot: SLOT, generatedAt: now(), shots }, null, 2), "application/json; charset=utf-8");
