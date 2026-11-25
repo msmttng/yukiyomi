@@ -236,7 +236,7 @@ function viewer(slot, slots) {
     }
     body += `</div></section>`;
   }
-  const nav = (BASEURL ? `<a href="${BASEURL}index.html">最新</a> ` : "") + slots.map((s) => s === slot ? `<b>${slotLabel(s)}</b>` : `<a href="${BASEURL}archive/${s}/index.html">${slotLabel(s)}</a>`).join(" ");
+  const nav = (BASEURL ? `<a href="${BASEURL}index.html">予報サイト（自分用）</a> ` : "") + slots.map((s) => s === slot ? `<b>${slotLabel(s)}</b>` : `<a href="${BASEURL}archive/${s}/index.html">${slotLabel(s)}</a>`).join(" ");
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>ユキヨミ 撮影画像（自分用）</title><style>
 body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;background:#f4f7fb;color:#123}
@@ -254,9 +254,20 @@ footer{font-size:11px;color:#678;padding:0 14px 30px}
 <nav>${nav}</nav><main>${body}</main><footer>各カメラの画像の権利は配信元にあります。このページは私的な閲覧専用で、公開していません。</footer></body></html>`;
 }
 
+// ---- 自分用の予報サイト：公開サイトに撮影画像を埋め込んだもの ----
+function privateSite() {
+  if (!/YUKI_SHOTS/.test(html)) return "";
+  const data = { at: slotLabel(SLOT), list: `${BASEURL}shots.html`, k: thumbs };
+  return html
+    .replace(/(href|src)="(yukiyomi_[^"]+|yukiyomi\.webmanifest)"/g, (_, a, f) => `${a}="https://msmttng.github.io/yukiyomi/${f}"`)
+    .replace(/<title>[^<]*<\/title>/, () => "<title>ユキヨミ（自分用）</title>")
+    .replace("<head>", () => `<head>\n<meta name="robots" content="noindex">\n<script>window.YUKI_SHOTS=${JSON.stringify(data)};</script>`);
+}
+
 if (!BUCKET) {
   await writeFile(`${OUT}/index.json`, JSON.stringify({ slot: SLOT, generatedAt: now(), shots }, null, 2), "utf8");
-  await writeFile(`${OUT}/index.html`, viewer(SLOT, [SLOT]), "utf8");
+  await writeFile(`${OUT}/shots.html`, viewer(SLOT, [SLOT]), "utf8");
+  await writeFile(`${OUT}/site.html`, privateSite(), "utf8");
   process.exit(ok === 0 ? 1 : 0);
 }
 
@@ -280,6 +291,8 @@ slots = [...new Set([...slots, SLOT])].filter((s) => Date.UTC(+s.slice(0, 4), +s
 const put = (name, text, type) => bucket.file(name).save(text, { contentType: type, metadata: { cacheControl: NOCACHE }, resumable: false });
 await put(`archive/${SLOT}/index.json`, JSON.stringify({ slot: SLOT, generatedAt: now(), shots }, null, 2), "application/json; charset=utf-8");
 await put(`archive/${SLOT}/index.html`, viewer(SLOT, slots), "text/html; charset=utf-8");
-await put(`index.html`, viewer(SLOT, slots), "text/html; charset=utf-8");
+await put(`shots.html`, viewer(SLOT, slots), "text/html; charset=utf-8");
+const site = privateSite();
+await put(`index.html`, site || viewer(SLOT, slots), "text/html; charset=utf-8");
 console.log(`uploaded ${files.length} images to gs://${BUCKET}/archive/${SLOT}/`);
 process.exit(ok === 0 ? 1 : 0);
