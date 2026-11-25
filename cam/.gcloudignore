@@ -1,0 +1,4 @@
+# Cloud Build に送らないもの（index.html は送る）
+node_modules/
+out/
+.git/
