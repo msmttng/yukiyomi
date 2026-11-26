@@ -256,12 +256,31 @@ footer{font-size:11px;color:#678;padding:0 14px 30px}
 
 // ---- 自分用の予報サイト：公開サイトに撮影画像を埋め込んだもの ----
 function privateSite() {
+  // 開いたときに公開サイトの最新版を読み込み、撮影画像（window.YUKI_SHOTS）を渡して表示する。
+  // こうすると、公開サイトを直したらすぐ自分用ページにも反映される（画像だけが撮影のたびに入れ替わる）。
   if (!/YUKI_SHOTS/.test(html)) return "";
   const data = { at: slotLabel(SLOT), list: `${BASEURL}shots.html`, k: thumbs };
-  return html
-    .replace(/(href|src)="(yukiyomi_[^"]+|yukiyomi\.webmanifest)"/g, (_, a, f) => `${a}="https://msmttng.github.io/yukiyomi/${f}"`)
-    .replace(/<title>[^<]*<\/title>/, () => "<title>ユキヨミ（自分用）</title>")
-    .replace("<head>", () => `<head>\n<meta name="robots" content="noindex">\n<script>window.YUKI_SHOTS=${JSON.stringify(data)};</script>`);
+  const json = JSON.stringify(data).replace(/</g, "\\u003c");
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>ユキヨミ（自分用）</title></head>
+<body style="font-family:-apple-system,'Hiragino Sans',sans-serif;padding:20px;color:#456"><p id="yk-ld">読み込み中…</p>
+<script>window.YUKI_SHOTS=${json};</script>
+<script>
+(async () => {
+  const SITE = ${JSON.stringify(SITE_URL)};
+  let h = "";
+  try { const r = await fetch(SITE + "?t=" + Date.now(), { cache: "no-store" }); if (r.ok) h = await r.text(); } catch (e) {}
+  if (!/const SITES = /.test(h)) {
+    document.getElementById("yk-ld").innerHTML = '予報サイトを読み込めませんでした。通信を確認して再読み込みしてください。<br><a href="' + window.YUKI_SHOTS.list + '">撮影画像の一覧を開く</a>';
+    return;
+  }
+  const base = SITE.replace(/[^/]*$/, "");
+  h = h.replace(/(href|src)="(yukiyomi_[^"]+|yukiyomi\\.webmanifest)"/g, (_, a, f) => a + '="' + base + f + '"')
+       .replace(/<title>[^<]*<\\/title>/, "<title>ユキヨミ（自分用）</title>")
+       .replace("<head>", '<head><meta name="robots" content="noindex">');
+  document.open(); document.write(h); document.close();
+})();
+</script></body></html>`;
 }
 
 if (!BUCKET) {
