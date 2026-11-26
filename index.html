@@ -169,6 +169,18 @@ tr.sel td.name button.r{color:var(--accent)}
 .obs{font-size:13px;margin:0 0 10px;padding:8px 10px;background:var(--surface2);border-radius:8px;display:none}
 .obs b{font-family:var(--f-num);font-size:17px;font-variant-numeric:tabular-nums}
 .obs .n{color:var(--muted);font-size:12px}
+.hrly{margin-top:14px}.hrly h3{font-size:15px;margin:0 0 8px}
+.hrscroll{overflow-x:auto}
+table.hrt{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+table.hrt th{white-space:nowrap;font-size:11px;font-weight:500;color:var(--muted);text-align:right;padding:4px 6px;border-bottom:1px solid var(--line);line-height:1.2}
+table.hrt td{text-align:right;padding:3px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.hrt .l{text-align:left;min-width:120px}table.hrt td.tm{color:var(--muted)}
+table.hrt .nv{display:inline-block;min-width:30px;text-align:right;font-weight:600;margin-right:6px}
+table.hrt .hb{display:inline-block;width:calc(100% - 40px);max-width:160px;height:8px;background:var(--surface2);border-radius:4px;vertical-align:middle;overflow:hidden}
+table.hrt .hb i{display:block;height:100%;background:var(--s4)}
+table.hrt tr.past{opacity:.45}table.hrt tr.hv td.tm{color:inherit;font-weight:600}
+table.hrt tfoot td{font-weight:600;border-bottom:0}table.hrt .rn{color:var(--bad);margin-left:3px}
+.day .hrgo{align-self:flex-start;min-height:32px;padding:4px 10px;font-size:12px}
 .days{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:12px}
 .day{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
 .day.pw{border-color:var(--warn);box-shadow:inset 0 0 0 1px var(--warn)}
@@ -207,7 +219,7 @@ footer a{color:var(--accent)}
 <div class="wrap">
   <header class="top">
     <h1><svg class="logo" viewBox="0 0 547.23 176.4" role="img" aria-label="ユキヨミ"><g transform="translate(38.2,38.2)"><g fill="none" stroke="currentColor" stroke-width="9.02" stroke-linecap="butt" stroke-linejoin="miter"><g transform="translate(0,0)"><path d="M23.6,38.2 H67.8 V76.4"/><line x1="10.6" y1="76.4" x2="89.4" y2="76.4"/></g><g transform="translate(123.61,0)"><line x1="14.6" y1="38.2" x2="85.4" y2="38.2"/><line x1="8.6" y1="61.8" x2="91.4" y2="61.8"/><line x1="42.2" y1="10.6" x2="57.8" y2="89.4"/></g><g transform="translate(247.22,0)"><path d="M19.6,23.6 H76.4 V76.4 H19.6"/><line x1="27.6" y1="50.0" x2="76.4" y2="50.0"/></g><g transform="translate(370.83,0)"><line x1="31.5" y1="17.8" x2="68.5" y2="27.4" stroke="#6fa9ee"/><line x1="26.5" y1="41.9" x2="73.5" y2="54.1" stroke="#3a78dd"/><line x1="20.1" y1="70.6" x2="79.9" y2="86.2" stroke="#3b3fc4"/></g></g></g></svg><small>国内スキー場の降雪予報 ・ 4つの気象モデルを比べて読む</small></h1>
-    <div class="meta"><span id="updated">読み込み中…</span><span id="ver" style="opacity:.6">v36</span><button class="btn" id="reload" type="button">最新に更新</button><button class="btn" id="camtoggle" type="button">ライブカメラ一覧</button></div>
+    <div class="meta"><span id="updated">読み込み中…</span><span id="ver" style="opacity:.6">v37</span><button class="btn" id="reload" type="button">最新に更新</button><button class="btn" id="camtoggle" type="button">ライブカメラ一覧</button></div>
   </header>
 
   <div id="msg"></div>
@@ -602,7 +614,11 @@ async function loadDetail(r,force){
   if(!ms.length) throw new Error("使えるモデルのデータがありません");
   const levels = [["山頂",r.top],["中腹",r.mid],["山麓",r.base]];
   // 時間ごとの中央値（グラフ用）
-  const hourly = time.map((_,i)=>({ snow: median(ms.map(s=>(s.P[i]==null||s.T[i]==null)?null:snowE(s,i,r,r.top))), t: median(ms.map(s=>tE(s,i,r,r.top))) }));
+  const sn = (i,e)=>median(ms.map(s=>(s.P[i]==null||s.T[i]==null)?null:snowE(s,i,r,e)));
+  const hourly = time.map((_,i)=>({ snow: sn(i,r.top), mid: sn(i,r.mid), base: sn(i,r.base),
+    t: median(ms.map(s=>tE(s,i,r,r.top))), tb: median(ms.map(s=>tE(s,i,r,r.base))),
+    rain: median(ms.map(s=>{ const f=fracE(s,i,r,r.base); return s.P[i]==null||f==null?null:s.P[i]*(1-f); })),
+    w: median(ms.map(s=>windAt(s,i,r.top))), g: median(ms.map(s=>s.G?s.G[i]:null)) }));
   const out = days.map((d,di)=>{
     const ok = ms.filter(s=>dayOK(s,d));
     const perModel = ms.map(s=>({label:s.label, cm: ok.indexOf(s)<0 ? null : d.idx.reduce((a,i)=>a+snowE(s,i,r,r.top),0)}));
@@ -635,7 +651,7 @@ async function loadDetail(r,force){
     const wdir = WT ? (Math.atan2(-U,-V)*180/Math.PI+360)%360 : null, wspd = WT ? SP/WT : null;
     return {date:d.date, top, lv, perModel, conf, q, gust, wtop, lift, am, fz, nOk: ok.length, prof, wdir, wspd};
   });
-  const res = {at: alt ? Date.now()-(CACHE_MIN-20)*60e3 : Date.now(), time, hourly, days:out, nModels:ms.length, dayStart:days.map(d=>d.idx[0]), alt};
+  const res = {at: alt ? Date.now()-(CACHE_MIN-20)*60e3 : Date.now(), time, hourly, days:out, nModels:ms.length, dayStart:days.map(d=>d.idx[0]), dayIdx:days.map(d=>d.idx), alt};
   DET[r.id]=res; return res;
 }
 
@@ -960,9 +976,11 @@ async function renderDetail(force,scroll){
     '<div id="amedas" class="obs"></div>'+
     '<canvas id="chart" role="img" aria-label="山頂の1時間ごとの降雪量と気温"></canvas>'+
     '<div class="legend"><span><i style="background:var(--s4)"></i>山頂の降雪（cm/時）</span><span><i style="background:var(--bad);height:3px;vertical-align:3px"></i>山頂の気温（℃）</span></div>'+
+    '<div class="hrly" id="hrly"><h3>1時間ごとの降雪</h3><div class="chips" id="hrdays"></div><div id="hrbody"></div></div>'+
     '<div class="days">'+days.map((x,i)=>{
       const mm = Math.max(1,...x.perModel.map(p=>p.cm||0));
       return '<div class="day'+(x.top>=threshold?" pw":"")+'"><div class="hd"><b>'+fmtDay(x.date,i)+'</b><span class="am">朝イチ '+(x.am==null?"—":r0(x.am)+"cm")+'</span></div>'+
+      '<button type="button" class="btn hrgo" data-hd="'+i+'">1時間ごとを見る</button>'+
       '<div class="big">'+r0(x.top)+'<span>cm（山頂）</span></div>'+'<div class="ens" id="ens'+i+'"></div>'+
       '<div class="pills"><span class="pill '+x.q[1]+'">雪質 '+x.q[0]+'</span><span class="pill '+x.conf[1]+'" id="encf'+i+'" title="4モデルの予想のそろい具合で判定（アンサンブル予報が取れると置き換わります）">確からしさ '+x.conf[0]+(x.nOk<d.nModels?"（"+x.nOk+"モデル）":"")+'</span>'+(i>=7?'<span class="pill warn">先の予報</span>':'')+'<span class="pill '+x.lift[1]+'">リフト '+x.lift[0]+'</span></div>'+
       '<div class="am">風（8〜16時の最大）山頂付近 '+(x.wtop==null?"—":r0(x.wtop)+"m/s")+' ／ 地上の突風 '+(x.gust==null?"—":r0(x.gust)+"m/s")+'</div>'+
@@ -976,12 +994,41 @@ async function renderDetail(force,scroll){
     '<div id="tmread" class="am"></div><div class="legend" id="tmleg" hidden></div></div>';
   setupTmap(r,d);
   drawChart(d);
+  setupHourly(d,days.length);
   renderAsk();
   renderAmedas(r);
   renderCams(r);
   renderEns(r,days.length);
   renderVerify(r);
   if(scroll) box.scrollIntoView({behavior:"smooth",block:"start"});
+}
+/* ---------- 1日の降雪を1時間ごとに ---------- */
+let hrDay = 0;
+function setupHourly(d,nd){
+  if(!d.dayIdx) return;
+  if(hrDay>=nd) hrDay=0;
+  const draw=()=>{
+    $("hrdays").innerHTML=d.days.slice(0,nd).map((x,i)=>'<button type="button" class="chip'+(i===hrDay?" on":"")+'" data-hd="'+i+'">'+fmtDay(x.date,i)+" "+r0(x.top)+'cm</button>').join("");
+    $("hrbody").innerHTML=hourlyTable(d,hrDay);
+  };
+  draw();
+  $("hrdays").onclick=e=>{ const b=e.target.closest("[data-hd]"); if(!b) return; hrDay=+b.dataset.hd; draw(); };
+  document.querySelectorAll(".hrgo").forEach(b=>b.onclick=()=>{ hrDay=+b.dataset.hd; draw(); $("hrly").scrollIntoView({behavior:"smooth",block:"start"}); });
+}
+function hourlyTable(d,di){
+  const idx=d.dayIdx[di]||[], H=idx.map(i=>Object.assign({hh:+d.time[i].slice(11,13)},d.hourly[i]));
+  if(!H.length) return '<p class="am">この日の時間ごとのデータがありません。</p>';
+  const now=new Date(), today=d.days[di].date===now.toLocaleDateString("sv-SE"), curH=now.getHours();
+  const mx=Math.max(0.5,...H.map(h=>h.snow||0));
+  const f1=v=>v==null?"—":v<0.05?"·":(Math.round(v*10)/10).toFixed(1);
+  const bar=v=>'<span class="hb"><i style="width:'+Math.min(100,(v||0)/mx*100)+'%"></i></span>';
+  const sum=k=>H.reduce((a,h)=>a+(h[k]||0),0), rain=sum("rain");
+  return '<div class="hrscroll"><table class="hrt"><thead><tr><th>時刻</th><th class="l">山頂の降雪</th><th>中腹</th><th>山麓</th><th>山頂<br>気温</th><th>山麓<br>気温</th><th>山頂付近<br>の風</th></tr></thead><tbody>'+
+    H.map(h=>'<tr class="'+(today&&h.hh<curH?"past":"")+(h.snow>=1?" hv":"")+'"><td class="tm">'+h.hh+'時</td>'+
+      '<td class="l"><span class="nv">'+f1(h.snow)+'</span>'+bar(h.snow)+'</td><td>'+f1(h.mid)+'</td><td>'+f1(h.base)+(h.rain>=0.5?'<small class="rn">雨</small>':'')+'</td>'+
+      '<td>'+r0(h.t)+'℃</td><td>'+r0(h.tb)+'℃</td><td>'+(h.w==null?"—":r0(h.w)+"m/s")+'</td></tr>').join("")+
+    '</tbody><tfoot><tr><td>合計</td><td class="l"><span class="nv">'+r0(sum("snow"))+'</span>cm</td><td>'+r0(sum("mid"))+'</td><td>'+r0(sum("base"))+'</td><td colspan="3" class="am">'+(rain>=1?"山麓で雨 約"+r0(rain)+"mm":"")+'</td></tr></tfoot></table></div>'+
+    '<p class="am">単位は cm/時（「·」はほぼ0）。各時間はモデルの中央値なので、合計は上の日ごとの値と少しずれることがあります。'+(today?"薄い行は過ぎた時間です。":"")+'</p>';
 }
 function drawChart(d){
   const cv=$("chart"); if(!cv) return;
