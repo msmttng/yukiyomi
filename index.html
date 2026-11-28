@@ -64,6 +64,10 @@ button,select,input{font:inherit;color:inherit}
 .banner{background:var(--surface2);border-left:4px solid var(--warn);padding:8px 12px;border-radius:6px;font-size:13px}
 .banner.err{border-left-color:var(--bad)}
 /* 当たり日 */
+.umwrap{position:relative;margin-top:6px}#umcv{width:100%;display:block;border-radius:8px;background:#dfe6ee;touch-action:pan-y}
+.umtip{position:absolute;pointer-events:none;background:rgba(0,0,0,.75);color:#fff;font-size:12px;padding:3px 7px;border-radius:6px;transform:translate(-50%,-130%);white-space:nowrap}
+.umctl{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}.umctl input{flex:1;min-width:140px}.umctl b{font-size:14px;min-width:9em}
+.umleg{display:flex;margin-top:6px;height:22px;font-size:10px;font-variant-numeric:tabular-nums}.umleg span{flex:1;display:flex;align-items:flex-end;justify-content:center;color:#fff;text-shadow:0 0 2px #000;padding-bottom:1px}
 .recctl .views{margin-bottom:6px}
 .recs{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:6px}
 .rec{border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;background:var(--surface);text-align:left;display:flex;flex-direction:column;gap:4px;color:inherit;font:inherit}
@@ -232,7 +236,7 @@ footer a{color:var(--accent)}
 <div class="wrap">
   <header class="top">
     <h1><svg class="logo" viewBox="0 0 547.23 176.4" role="img" aria-label="ユキヨミ"><g transform="translate(38.2,38.2)"><g fill="none" stroke="currentColor" stroke-width="9.02" stroke-linecap="butt" stroke-linejoin="miter"><g transform="translate(0,0)"><path d="M23.6,38.2 H67.8 V76.4"/><line x1="10.6" y1="76.4" x2="89.4" y2="76.4"/></g><g transform="translate(123.61,0)"><line x1="14.6" y1="38.2" x2="85.4" y2="38.2"/><line x1="8.6" y1="61.8" x2="91.4" y2="61.8"/><line x1="42.2" y1="10.6" x2="57.8" y2="89.4"/></g><g transform="translate(247.22,0)"><path d="M19.6,23.6 H76.4 V76.4 H19.6"/><line x1="27.6" y1="50.0" x2="76.4" y2="50.0"/></g><g transform="translate(370.83,0)"><line x1="31.5" y1="17.8" x2="68.5" y2="27.4" stroke="#6fa9ee"/><line x1="26.5" y1="41.9" x2="73.5" y2="54.1" stroke="#3a78dd"/><line x1="20.1" y1="70.6" x2="79.9" y2="86.2" stroke="#3b3fc4"/></g></g></g></svg><small>国内スキー場の降雪予報 ・ 4つの気象モデルを比べて読む</small></h1>
-    <div class="meta"><span id="updated">読み込み中…</span><span id="ver" style="opacity:.6">v38</span><button class="btn" id="reload" type="button">最新に更新</button><button class="btn" id="camtoggle" type="button">ライブカメラ一覧</button></div>
+    <div class="meta"><span id="updated">読み込み中…</span><span id="ver" style="opacity:.6">v39</span><button class="btn" id="reload" type="button">最新に更新</button><button class="btn" id="camtoggle" type="button">ライブカメラ一覧</button></div>
   </header>
 
   <div id="msg"></div>
@@ -254,6 +258,17 @@ footer a{color:var(--accent)}
       <div class="views" id="recwin"></div>
     </div>
     <div id="recbody"><p class="askp">読み込み中…</p></div>
+  </section>
+
+  <section class="panel" id="umap" aria-labelledby="h-umap">
+    <h2 id="h-umap">上空の寒気マップ</h2>
+    <p class="askp" id="umnote">上空約1500m（850hPa）の気温です。−6℃より冷たい空気が来ると、平地でも雪になる目安です。</p>
+    <div class="views" id="umlev"></div>
+    <div class="umwrap"><canvas id="umcv" aria-label="上空の気温の地図"></canvas><div id="umtip" class="umtip" hidden></div></div>
+    <div class="umctl"><button class="btn" id="umprev" type="button" aria-label="6時間前">‹</button><button class="btn" id="umplay" type="button">再生</button><button class="btn" id="umnext" type="button" aria-label="6時間後">›</button>
+      <input type="range" id="umslider" min="0" max="0" value="0" aria-label="予報の時刻"><b id="umtime">—</b></div>
+    <div id="umleg" class="umleg"></div>
+    <p class="askp" id="umsrc"></p>
   </section>
 
   <section class="panel" aria-labelledby="h-hits">
@@ -1021,6 +1036,132 @@ $("recday").addEventListener("click",e=>{const b=e.target.closest("[data-rday]")
 $("recwin").addEventListener("click",e=>{const b=e.target.closest("[data-rwin]"); if(!b) return; recWin=b.dataset.rwin; store.set("recwin",recWin); renderRec();});
 $("recbody").addEventListener("click",pick);
 
+/* ---------- 上空の寒気マップ（850hPa / 500hPa の気温と高度） ---------- */
+const COAST = [[1211,186,7,-3,2,0,1,2,1,0,1,-1,0,-2,-1,-1,0,-4,0,-3,2,-1,0,-1,1,-1,-4,-9,-1,0,-3,-2],[1198,160,0,3,0,0,4,-3,1,1,1,0,0,1,-1,4,1,4,0,4,0,2,2,9,2,1,3,0],[1428,544,2,-3,-1,-3,4,-6,0,-2,0,-4,-1,-3,0,-4,1,-2,0,-1,2,-1,0,-2,0,-1,3,-9,2,-4,3,-6,1,-2,3,-3,0,-2,-1,2,-5,4,-3,1,-6,0,-2,-2,-4,-10,0,-4,1,-2,2,-2,3,-5,2,0,1,0,1,-4,-2,-4,0,5,-1,1,-5,0,-1,1,-1,0,-2,-1,-2,-5,-1,-2,-1,1,-2,5,1,2,1,4,0,5,2,4,-1,3,-2,4,1,4,1,5,1,6,-1,4,1,4,0,2,-1,2,-4,3,1,1,-1,1,0,4,1,3,1,2,0,2,-1,3,2,2,1,0,2,-1,2,0,1,1,-1,1,1,1,1,0,0,0,-1,0,1,2,-4,4,3,0,1,1,1,0],[1438,441,3,0,4,-2,2,0,2,1,5,3,-3,-4,0,-1,0,-1,2,-4,2,0,2,1,1,0,-2,-1,-1,-1,-2,0,-4,-2,-3,-1,-4,1,-2,-1,-4,-3,-2,-2,-1,-3,-1,-1,-7,3,-6,3,-5,-1,-4,-2,-3,3,-2,0,-2,-2,0,-1,2,-2,2,0,5,-3,-1,0,-2,-1,-2,1,-3,-3,-3,-1,-1,2,1,3,0,2,-3,2,0,1,1,2,2,1,3,3,1,1,-1,1,0,1,1,0,3,-1,3,0,2,0,1,1,0,3,2,4,1,3,1,2,0,2,-1,2,-1,3,1,2,2,1,10,-8,4,-3,5,-3],[1412,414,3,0,-1,-3,0,-4,1,-1,3,-3,2,-5,0,-4,-1,-3,-2,-1,-2,-2,0,-4,-4,-1,-1,-2,-1,-2,1,-4,0,-4,0,-1,-3,-3,-1,-2,0,-3,0,-1,3,-4,-3,0,-1,-2,-1,-2,0,-1,-3,-2,-2,-1,-1,1,0,0,0,3,3,3,-1,1,-2,0,0,-2,-1,-1,0,-1,0,0,0,-2,-2,2,-2,0,-2,-1,0,-4,-2,-2,-1,0,0,1,0,3,1,0,-2,1,-1,0,-3,-4,-1,-1,-7,1,-4,-1,2,1,0,1,-3,0,0,0,-1,-1,0,0,0,3,0,0,-1,1,-1,-1,-2,-3,4,-3,0,-1,-6,-1,-4,-6,-2,-1,-2,1,-4,4,0,3,2,1,1,1,0,1,0,1,-4,-1,-3,2,-1,0,-4,-1,-2,-2,-6,-1,-3,-1,-1,0,-2,0,-1,-1,-3,2,-1,-1,-1,-1,-1,-4,-4,3,-5,-2,-1,1,-2,0,0,3,1,0,0,1,4,0,9,6,4,4,2,1,4,1,1,-1,2,0,4,0,12,2,1,0,-1,-1,1,-1,4,0,1,0,3,3,-1,2,1,1,3,3,3,3,0,3,0,2,1,2,5,1,0,-1,-4,-3,1,-1,0,-2,2,0,1,0,2,2,8,2,3,3,3,3,3,2,2,1,1,4,3,4,1,3,1,2,1,2,-1,3,-3,0,2,1,1,3,-1,2,1,2,3,1,0,2,0,2,1,0,2,0,1,-3,0,-1,2,1,2,0,1,1,0,2,0,0,-4,-1,0,2,1,2,3,-1],[1344,343,2,-1,1,-4,0,0,-3,-2,-2,-2,0,-2,-2,2,-4,1,-3,-1,-2,-3,-1,-1,0,-2,-2,0,-2,0,1,1,-2,0,0,1,-1,1,1,2,-1,0,0,1,-4,-1,6,4,2,3,1,1,2,-2,1,0,4,1,0,1,0,1,1,0,2,1,2,1,3,-1],[1312,336,2,0,2,1,1,-1,0,-1,-2,-2,4,0,-1,-2,2,-1,-1,0,1,-1,-3,-4,-2,-6,0,-2,-2,-3,-2,0,-1,0,1,-1,-4,-3,1,3,-1,3,1,0,0,1,-1,0,-1,-1,-1,-2,1,-1,0,-1,-4,1,-1,1,2,1,0,1,-1,2,0,2,0,1,2,1,2,4,-1,1,1,0,-1,1,-1,3,-2,1,-1,-1,1,-2,1,0,0,-2,-1,0,-1,1,-3,-2,0,1,-1,2,0,2,1,-2,2,0,-1,1,-3,2,0,1,2,0,0,1,4,2,2,0,1,2,2,1,3,0,1,-2,1,-1],[1210,226,-1,-2,-1,-5,-1,1,-1,4,-3,1,-2,7,0,2,0,3,5,8,2,2,2,3,4,2,1,1,1,0,3,-2,0,-1,-1,-2,0,-3,-2,-4,-2,-9,-2,-4,-2,-2],[1109,200,1,-1,0,-2,-2,-1,-2,-3,-1,-6,-5,-2,1,-1,-1,0,-2,0,-1,-1,-2,-1,-5,2,-3,1,0,2,-1,2,1,4,6,5,-1,0,1,1,2,0,2,1,4,0,1,1,1,-1,1,0,0,1,2,-1,0,1,1,0,2,-1],[1677,605,-5,-1,-2,-1,-7,-4,-1,-1,-1,2,3,5,-2,0,-3,-1,-8,-3,0,-2,-1,-1,-2,1,-1,1,-3,1,-3,-2,0,1,-3,0,-4,-2,-1,-3,0,-2,-2,-2,-2,0,1,-1,0,0,-5,-3,-4,-3,-1,-3,0,-2,4,-1,0,-1,1,1,0,1,2,0,5,-1,0,-2,-4,-2,0,-2,0,-1,0,-3,1,-1,1,0,3,0,-1,-1,1,-4,-3,-2,-2,1,-2,1,1,1,3,1,0,1,-1,0,-2,0,-2,-1,0,-1,-4,-2,-3,-4,-1,-2,1,-3,3,-3,0,-1,-5,-3,-3,0,-2,1,-3,-1,-7,-3,-2,-2,-1,-2,2,-2,-1,-2,1,-1,0,-2,-1,0,-1,1,-2,0,-6,-2,-3,-1,-1,1,-1,0,-1,0,2,-1,-1,-3,0,-2,-4,-6,-3,-2,-3,-1,-3,-3,-5,-2,0,2,-2,1,0,1,0,5,-1,6,-2,1,-1,3,-1,8,-3,8,-1,7,0,1,1,8,3,6,1,1,6,4,1,1,2,2,-1,1,-1,1,1,1,5,0,3,2,6,0,2,2,7,3,4,3,2,3,7,4,4,1,5,4,4,2,3,3,6,2,3,1,4,0,3,1,-1,1,0,1,3,1,1,1,0,1,-2,1,1,1,1,1,1,3,1,3,4,2,6,-1,0,0,2,0,0,1,-6,1,-4,1,-11,-1,-1,-1,1,-1,-1,-1,-1,-2,-1,-2,0,-1,3,-1,-2,-1,-1,-1,-1,2,-1,0,-1,0,-3,0,-14,-7,-2,-2,-3,-1,-3,-1,0,2,2,2,-2,0,-3,-1,-1,1,1,1,0,2,3,3,1,2,0,1,-1,0,-6,-2,-3,2,-1,0,-11,-1,-6,0,-4,-1,-4,-2,-1,-2,-5,-3,-4,-3,-7,-3,-4,-3,-2,-2,-1,-1,0,-1,-2,-2,2,0,3,0,4,0,2,-1,0,-2,-4,0,-1,-1,-2,1,-3,-1,-2,0,-3,1,-3,0,-1,-1,-2,0,-3,-2,-5,1,-1,0,-1,-1,-8,0,-2,2,4,1,5,0,3,0,-1,1,-4,0,-3,2,-2,1,-3,0,-2,-1,-3,0,2,1,-11,2,-2,0,-3,-2,1,-1,-3,0,-1,0,-1,-1,0,0,3,0,-1,-1,-2,0,-2,0,-2,1,-4,0,-2,-1,-2,0,-7,1,-3,1,-1,-1,-1,-2,-3,0,-1,0,-1,2,-2,0,-11,0,-6,0,-4,-1,-3,1,-6,-2,-6,-2,-4,-4,-8,-3,-1,-1,-3,-4,-4,-1,-2,-2,-2,0,-2,-2,-2,0,-2,-2,-3,-1,-5,-4,-1,-2,-4,-3,-9,-4,-3,-1,-3,-2,-4,-2,-3,-1,-2,-2,-1,-1,1,-1,6,-1,9,0,0,-1,-1,-6,0,-1,1,0,1,0,1,0,2,0,1,2,-2,1,0,1,3,1,3,0,-2,-1,-2,-1,3,-1,2,-1,-2,0,-1,-2,-3,-1,1,-1,7,1,3,1,1,2,1,1,1,-1,0,-1,-3,-3,2,0,2,2,0,2,0,3,0,1,6,-1,4,1,5,-2,1,-3,4,-2,3,-1,2,-2,2,0,0,-1,-2,-2,-4,1,3,-2,2,-1,-1,-3,-1,-1,1,0,3,-2,-1,-1,0,-2,-5,-3,-1,-2,-1,-2,0,-1,-2,-3,0,-3,0,-4,1,0,-1,-2,0,-3,-2,-5,0,0,1,-1,-2,-2,-1,-4,-7,-5,-4,-5,-4,-3,-2,-4,-1,-2,-1,0,-1,-2,-4,-5,-9,-6,-5,-5,-2,-2,-2,-1,-4,-4,0,-2,-2,-1,-2,-2,-11,-6,-8,-2,-1,0,-1,1,-1,0,-2,1,-4,0,0,4,-4,-2,0,0,1,2,-1,0,-1,0,-6,-7,-5,1,1,-2,-1,-2,-1,0,-1,0,-3,-1,-4,-5,-1,-1,1,-3,-1,-2,0,-2,0,0,-4,-2,-2,-2,-4,-2,-2,-2,-2,-1,-3,0,-1,-1,-3,-1,-1,-1,0,-3,-1,0,0,-2,4,-1,2,-2,3,-2,3,-5,7,-9,1,-2,1,-4,-1,-4,0,-2,1,-1,1,1,0,-2,-3,-6,-1,-1,-1,-1,-6,0,-1,-1,0,-1,-3,0,-1,1,-3,0,-1,-1,1,-1,0,-1,-1,0,-1,1,-1,0,0,-1,1,-1,-2,-1,-1,0,1,2,-1,1,-2,-2,-1,-2,-1,1,-2,-1,0,-1,-1,0,0,2,-2,2,0,0,2,0,0,1,1,0,-2,0,-1,4,2,3,1,1,-1,0,0,0,2,2,1,1,-2,0,1,1,-2,2,0,3,0,2,-1,0,-2,0,0,1,0,1,3,1,1,0,2,-1,1,-1,1,1,-1,1,-2,2,1,1,-1,1,0,2,-1,1,0,1,-2,1,-2,-1,-1,-1,-1,2,-1,0,-1,1,-1,0,-1,-2,-2,-1,-1,1,-3,1,2,2,0,0,-5,0,2,1,0,1,2,3,2,1,3,0,-4,1,0,1,2,4,0,2,-3,1,-3,2,-1,-1,-1,-1,0,2,-3,1,1,1,-3,-2,-3,0,-1,1,-1,-1,-3,0,-1,-1,-4,-1,-5,-2,-3,-3,-1,-1,-2,0,-1,0,1,-1,-4,-1,-1,-1,-1,2,6,2,-1,1,2,2,-5,0,0,1,2,1,0,2,0,0,3,2,4,4,1,1,0,0,-2,2,-2,1,-1,2,-1,-2,-5,1,-4,-3,-3,-4,-9,-3,-2,-1,-1,-2,-1,-2,-2,-2,-4,0,-3,-1,-3,1,-2,-1,-2,-4,1,-3,1,-1,2,-1,5,-1,3,0,1,-1,2,-3,-1,-1,0,-3,1,-1,4,-1,3,1,1,1,0,1,4,2,0,1,5,1,2,-1,2,-1,2,0,2,-1,4,-1,1,1,2,-1,4,0,-1,-1,0,-1,-2,-1,1,-1,0,-1,-2,-1,-1,0,0,2,-3,0,-8,-4,-3,0,1,-2,-1,1,-1,-1,0,-2,-1,-1,-2,0,-1,0,0,1,-1,0,-1,-1,1,-1,1,0,-2,-1,-1,-2,-3,-1,-3,-3,0,-2,-2,-1,0,-2,0,-1,2,1,2,-2,4,-2,3,-1,2,-7,4,-6,0,-2,0,-1,4,-3,1,0,0,-2,0,0,3,-1,1,-2,1,-2,-1,0,-4,2,-4,0,-2,1,-3,1,-5,-2,2,0,3,1,2,0,1,-2,3,-1,3,-2,3,-2,1,-2,1,-2,-5,-1,-4,-2,-1,-2,-1,0,-4,0,-2,-2,3,1,1,-2,3,1,3,1,1,0,1,-1,3,-2,4,-1,-6,-4,2,0,2,1,0,0,1,-1,-1,-4,0,0,-2,2,-2,-1,-1,-1,3,-1,0,0,-1,-1,-1,0,2,0,-1,-1,-1,-2,1,-3,-1,0,-2,-1,-1,1,-1,0,-1,-3,-3,0,1,-1,-2,-3,0,-2,-2,-2,-1,-1,-3,-5,0,0,-1,0,-1,2,-1,-1,-1,1,0,-2,2,-1,1,-2,-4,-2,-4,0,2,-2,3,1,0,-1,-1,-3,1,-2,0,0,-2,1,-2,0,-1,-1,1,0,1,-2,-3,0,-1,-1,1,-1,-1,-1,-3,-1,1,-1,0,-1,-4,0,-2,0,-1,0,0,-1,-2,0,1,-1,1,0,1,-2,-3,-2,-1,0,-1,-2,-1,0,-1,0,1,-1,-1,-1,-1,1,0,0,-2,-1,-2,0,0,-1,-3,-1,1,-1,-2,-1,0,-2,0,-1,-2,1,-1,-1,-3,-1,-3,1,0,-1,-1,-1,-1,0,-2,1,-3,-2,-2,0,0,1,0,1,-2,-2,1,-1,-3,1,0,-1,0,-1,0,-1,-4,1,1,1,-2,1,-2,3,0,1,0,1,-1,0,-1,0,0,-2,-1,0,3,-3,0,-2,0,-1,-1,-1,-4,-1,0,1,-1,-1,0,-2,-1,0,-1,0,-2,-1,-2,1,0,1,0,0,0,-2,-1,-1,-4,1,0,-1,-1,0,-2,-1,-3,-1,-3,0,0,-1,-2,0,-2,-2,-1,0,-1,1,0,-1,-2,-2,0,-1,0,0,2,-1,0,0,-1,-1,2,-2,0,-1,-2,-1,-2,0,-2,0,0,1,1,0,0,0,-1,1,-1,1,0,1,-1,2,0,2,0,0,1,2,1,1,0,1,-1,0,0,1,-1,-1,-1,2,-1,0,0,-2,-2,0,-2,-1,0,1,0,1,-3,0,-2,2,0,1,-1,0,0,-3,-1,0,-1,1,-1,-1,-4,-1,-1,-1,-3,-1,0,-2,-2,-2,-1,1,-2,0,-2,0,1,-3,-2,-2,0,-1,-1,-1,-3,-3,-2,-1,-2,-3,0,-3,-2,-3,3,-5,6,-6,0,0,0,-2,-1,1,1,-1,2,-3,4,-3,1,-2,5,-4,1,-2,2,0,2,-2,1,0,0,-1],[976,160,0,3,0,2,1,1,-3,-1,-2,4,0,2,-4,3,1,-1,-1,-1,1,-2,-1,-3,-2,-1,-2,-1,-1,1,-1,2,0,0,0,-2,1,-2,-3,-1,0,0,-2,-1,-1,-1],[953,161,0,-1],[949,160,0,2,-1,-2],[947,161,0,4,0,-2,-3,-2,-1,-1,-1,0,1,5,1,1,1,5,1,2,0,3,-2,6,-2,5,0,0,-1,2,-1,4,-1,-2,1,-1,-1,-1,-2,1,-2,4,1,0,2,-2,2,1,0,1,-2,1,-1,2,-1,1,1,1,-1,0,-2,1,-2,1,0,-1,0,-1,0,0,-1,0,-1,2,1,1,-1,0,1,2,-1,0,-1,-2,-1,0,0,0,1,1,-2,3,0,-3,-4,5,-2,4,-1,5,-2,5,1,1,-1,0,-3,4,0,2,-3,-3,-3,0,-1,1,-2,4,1,2,-1,3,0,-2,-3,1,1,-1,1,-1,1,0,0,-2,-1,0,1,-2,-1,0,-1,-1,2,-4,0,-1,-2,-3,-2,-2,0,0,-1,1,0,1,1,2,-2,-2,-1,1,0,2,1,2,-1,-1,-1,-4,-2,-2,-1,5,0,-4,-1,-2,-2,0,0,1,-1,1,0,2,-1,-2,-1,0,1,-1,1,-1,-2,0,0,0,-2,-1,0,1,0,3,-1,1,0,-3,0,-1,-2,-1,-1,2,0,-2,-2,0,0,1,1,4,-1,1],[880,222,2,-1,-1,-1],[1457,188,0,-1,-1,1,1,0],[1457,163,-1,1,1,-1],[1142,222,-1,1,1,0,0,0,0,-1],[1268,343,0,0,-2,1,1,0,1,-1],[1548,493,-1,0,-1,0,0,1,2,2,1,0,-1,-1,0,-2],[1344,345,-1,-1,-1,1,1,0,1,0,0,0],[1458,181,-1,0,1,1,0,-1,0,0],[1219,189,0,-1,-1,0,1,1,0,1,1,0,-1,-1],[1213,191,-1,-1,0,1,0,0,0,1,1,-1],[1215,194,0,-1,-1,1,0,0,1,0],[1220,204,-1,0,0,1,1,0,0,-1],[1219,208,-1,-1,0,0,0,0,0,1,1,0],[1636,586,-1,-1,-1,1,2,0,1,2,1,1,0,1,4,1,3,1,1,0,1,-2,-1,-1,-3,-1,-7,-2],[1677,547,-2,1,-1,1,1,0,4,-2],[1667,548,-1,-1,-4,2,-2,3,-2,1,1,1,4,-1,-1,-1,0,0,5,-4],[1564,507,-1,-1,-1,1,0,0,0,1,2,1,1,-1,0,0,-1,-1],[1559,503,-1,-1,-3,-1,-1,-1,-2,1,0,1,0,1,1,0,1,1,3,0,2,3,2,1,0,-2,-2,-3],[1541,488,-1,-1,0,1,1,1,1,0,-1,-1],[1556,508,0,0,-1,1,1,0,0,-1],[1531,478,0,-1,-1,0,1,1,0,0],[1520,469,-2,-1,0,0,-1,1,2,0,3,2,1,0,-3,-2],[1497,456,-3,0,3,2,1,1,2,1,4,2,2,0,-4,-2,0,-1,-5,-3],[1486,453,-3,-1,-4,-2,-2,0,-1,-2,-3,-1,-1,-1,-3,-2,1,2,1,1,1,1,4,3,3,1,0,2,2,-1,2,0,3,2,2,0,0,0,0,-1,0,0,-2,-1],[1506,590,-1,0,0,1,1,0,1,1,0,-1,-1,-1],[1379,551,3,-1,-1,0,-1,-2,-3,-1,-2,2,-3,-1,1,1,3,3,3,-1],[1372,551,-1,-2,-4,1,3,1,2,0],[1467,437,-1,0,0,1,2,1,1,-1,-2,-1],[1462,445,2,-1,2,0,-1,0,-4,-2,-2,-1,-1,-2,-2,-1,0,-1,-2,0,1,2,2,2,4,4,1,0],[1243,245,-1,-1,0,-1,-1,1,0,1,1,0,1,1,0,-1],[1239,243,-2,0,1,0,0,1,1,0,0,-1],[1254,247,-1,0,0,2,0,0,1,-2],[1283,267,-4,-3,0,-1,-1,0,0,-1,-1,-1,0,0,-1,1,1,1,0,1,2,2,0,1,1,-1,1,1,2,2,0,-1,0,-1],[1290,277,-1,0,0,2,1,0,0,-2],[1295,282,-1,-1,-2,2,4,2,1,0,0,-1,-2,-1,0,-1],[1293,281,-1,0,0,1,1,-1],[1306,303,-2,0,0,1,1,1,2,-1,-1,-1],[1310,304,-1,0,0,0,1,4,1,0,0,-2,-1,-2],[1287,328,1,0,1,-1,-1,-1,-1,0,0,0,0,2],[1301,322,-1,0,0,0,0,1,0,0,0,2,2,0,0,-2,-1,-1],[1304,324,-2,1,2,0,1,0,-1,-1],[1334,362,-2,0,0,0,0,1,1,0,1,-1],[1383,378,-1,0,1,1,0,1,-1,0,1,2,2,1,0,-2,1,0,-1,-2,-2,-1],[1395,421,-1,0,0,1,2,0,-1,-1],[1411,453,-1,0,0,1,0,1,1,-1,0,-1],[1413,451,-2,1,0,0,1,0,1,0,0,-1],[1398,331,0,0,0,0,1,0,-1,0],[1395,347,-1,0,0,0,0,1,1,-1],[1349,343,-1,-1,-1,0,0,1,1,2,2,0,-1,-1,0,-1],[1291,328,-1,2,1,1,0,0,1,-1,-1,-2],[1295,332,-1,0,1,1,1,1,-1,-2],[1298,337,-1,0,0,0,0,1,1,0,0,-1],[1293,341,-1,0,0,0,0,2,1,0,0,-2],[1294,344,0,-1,-1,1,0,2,2,1,0,-2,-1,-1,0,0],[1326,341,-1,0,0,0,0,1,1,-1],[1323,339,1,0,0,-1,-2,1,0,0,1,0],[1184,245,0,-1,-1,0,0,1,1,0],[1182,245,-1,-1,0,0,0,1,0,1,1,-1],[1287,348,-1,-1,-1,1,0,1,1,0,1,1,0,-2],[1281,348,0,-1,-1,0,-1,1,0,-1,-1,1,0,1,1,0,1,0,1,-1],[1278,346,0,0,-1,0,1,1,0,-1],[1263,332,-1,0,0,1,0,1,1,1,4,0,2,0,0,-1,0,-1,-3,-1,-3,0],[1262,344,-1,0,1,1,1,0,1,0,-2,-1],[1265,377,0,-1,-1,0,0,2,0,0,1,-1],[1219,315,-1,0,-5,1,-1,2,3,0,1,-2,3,-1],[1223,300,-3,0,0,1,3,0,0,-1,0,0],[1222,297,-2,0,1,1,0,0,1,-1],[1224,299,0,0,-1,0,1,1,0,-1],[1198,255,-1,-1,0,0,0,2,1,1,0,-1,0,-1],[1104,211,0,0,1,0,0,-1,-1,0,-1,0,1,1],[1076,212,-1,-1,-1,0,1,1,0,1,1,-1],[1075,209,-1,0,1,1,1,0,-1,-1],[1070,207,-1,1,1,1,0,-1,0,-1],[1069,208,-1,1,0,0,1,-1],[976,163,-1,0,0,2,0,0,1,-1,0,-1],[945,161,1,1,0,-2],[937,187,-2,2,1,0,1,0,0,-2],[935,199,0,-1,-1,1,0,1,1,-1],[930,199,0,-1,-1,2,0,1,1,-2],[937,196,2,-2,0,-1,-1,0,-2,2,1,1],[919,218,-1,0,0,0,0,1,1,-1],[920,215,-1,0,0,2,0,0,1,0,0,-2],[912,222,-2,-1,1,4,1,-1,0,-2],[916,224,-1,0,-1,1,1,1,1,-2],[906,230,1,-1,-1,1,-1,0,1,0,0,0],[908,221,-3,0,2,2,0,2,-1,1,-1,2,1,1,1,-1,0,-2,2,-1,-1,-3,0,-1],[1297,317,0,-1,0,1,1,1,-1,-1],[1264,365,0,-1,-1,1,0,1,1,-1],[1249,395,-1,0,1,1,0,0,0,-1],[1213,281,-2,0,0,0,1,1,1,-1],[1136,228,0,0,-2,1,0,0,1,0,1,-1],[1128,216,-1,1,1,1,1,0,-1,-1,0,-1],[1126,216,-1,0,1,1,0,0,0,-1],[1140,222,-1,0,0,1,1,0,0,-1],[1262,347,-1,0,0,1,-1,1,1,0,1,-1,0,-1],[1422,266,-1,1,1,-1],[1309,375,0,-1,-1,1,0,0,1,1,0,-1],[1459,435,0,-1,0,0,0,1],[1464,436,-1,0,1,0],[1460,434,1,0,-1,0],[1247,380,0,-1,-1,1,1,0]];
+const UM = { lon0:96, lon1:159, lat0:24, lat1:60, step:3 };
+const UM_LEV = { p850:{p:850, lab:"850hPa（約1500m）", note:"上空約1500m（850hPa）の気温です。−6℃より冷たい空気が来ると平地でも雪、−12℃以下は大雪になりやすい目安です。", key:[-6,-12], zstep:6},
+                 p500:{p:500, lab:"500hPa（約5500m）", note:"上空約5500m（500hPa）の気温です。−30℃以下は雪雲が発達しやすく、−36℃以下は大雪になりやすい目安です。", key:[-30,-36], zstep:6} };
+const UM_MODELS = { ecmwf_ifs025:"ECMWF", gfs_seamless:"GFS" };
+let umLev = store.get("umlev2","p850"), umModel = store.get("ummodel","ecmwf_ifs025"), umIdx = null, umData = {}, umPlay = null, umSeen = false;
+const umPts = ()=>{ const a=[]; for(let la=UM.lat1; la>=UM.lat0; la-=UM.step) for(let lo=UM.lon0; lo<=UM.lon1; lo+=UM.step) a.push([la,lo]); return a; };
+const UM_NX = Math.round((UM.lon1-UM.lon0)/UM.step)+1, UM_NY = Math.round((UM.lat1-UM.lat0)/UM.step)+1;
+async function umLoad(model){
+  const c=umData[model]; if(c && Date.now()-c.at < 3*3600e3) return c;
+  const pts=umPts(), T850=[],Z850=[],T500=[],Z500=[]; let time=null;
+  if(MOCK){ const n=40, t0=new Date(); t0.setHours(9,0,0,0); time=[...Array(n)].map((_,i)=>new Date(t0.getTime()+i*6*3600e3+9*3600e3).toISOString().slice(0,16));
+    pts.forEach(([la,lo])=>{ const tt=[...Array(n)].map((_,i)=>{ const cx=125+i*0.6, cy=52-i*0.15; return 14-0.9*(la-25)-22*Math.exp(-((lo-cx)**2/180+(la-cy)**2/60)); });
+      T850.push(tt); Z850.push(tt.map(t=>1300+t*8)); T500.push(tt.map(t=>t-28)); Z500.push(tt.map(t=>5500+t*12)); });
+    return umData[model]={at:Date.now(), time, f:{p850:[T850,Z850],p500:[T500,Z500]}}; }
+  for(let k=0;k<pts.length;k+=100){
+    const part=pts.slice(k,k+100);
+    const arr = await getJSON(API+"?latitude="+part.map(p=>p[0]).join(",")+"&longitude="+part.map(p=>p[1]).join(",")+
+      "&hourly=temperature_850hPa,geopotential_height_850hPa,temperature_500hPa,geopotential_height_500hPa&models="+model+"&forecast_days=10&temporal_resolution=hourly_6&timezone=Asia%2FTokyo");
+    arr.forEach(o=>{ const h=o.hourly; time=time||h.time; T850.push(h.temperature_850hPa); Z850.push(h.geopotential_height_850hPa); T500.push(h.temperature_500hPa); Z500.push(h.geopotential_height_500hPa); });
+  }
+  return umData[model]={at:Date.now(), time, f:{p850:[T850,Z850],p500:[T500,Z500]}};
+}
+// 気温の色（2℃ごとの段）
+const UM_COL=[[-40,"#4b0a4f"],[-36,"#7d1a8c"],[-32,"#b02ccf"],[-28,"#d653f0"],[-24,"#7a2fd6"],[-20,"#4a2fd6"],[-16,"#2b48e6"],[-12,"#2f7ff0"],[-8,"#45b4f2"],[-4,"#53d8d8"],[0,"#5ad68c"],[4,"#8edb4a"],[8,"#e9e94a"],[12,"#f2c040"],[16,"#ee9b3a"],[20,"#e06a2e"],[24,"#c93f2a"],[28,"#9e2a3a"]];
+const hex2=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+const UM_RGB=UM_COL.map(([t,h])=>[t,hex2(h)]);
+function umColor(t){ const b=Math.floor(t/2)*2+1; let i=0; while(i<UM_RGB.length-1 && UM_RGB[i+1][0]<=b) i++;
+  if(i>=UM_RGB.length-1) return UM_RGB[UM_RGB.length-1][1]; const [t0,c0]=UM_RGB[i],[t1,c1]=UM_RGB[i+1], f=Math.max(0,Math.min(1,(b-t0)/(t1-t0)));
+  return [0,1,2].map(j=>Math.round(c0[j]+(c1[j]-c0[j])*f)); }
+function umGrid(arr,ti){ const g=new Float32Array(UM_NX*UM_NY); for(let i=0;i<g.length;i++){ const v=arr[i]?arr[i][ti]:null; g[i]=v==null?NaN:v; } return g; }
+function umAt(g,lo,la){ const fx=(lo-UM.lon0)/UM.step, fy=(UM.lat1-la)/UM.step, x0=Math.max(0,Math.min(UM_NX-2,Math.floor(fx))), y0=Math.max(0,Math.min(UM_NY-2,Math.floor(fy))), dx=fx-x0, dy=fy-y0;
+  const a=g[y0*UM_NX+x0], b=g[y0*UM_NX+x0+1], c=g[(y0+1)*UM_NX+x0], d=g[(y0+1)*UM_NX+x0+1];
+  return a*(1-dx)*(1-dy)+b*dx*(1-dy)+c*(1-dx)*dy+d*dx*dy; }
+const UM_KX = Math.cos(42*Math.PI/180);
+function umProj(W,H){ const sx=W/((UM.lon1-UM.lon0)*UM_KX), sy=H/(UM.lat1-UM.lat0); return {x:lo=>(lo-UM.lon0)*UM_KX*sx, y:la=>(UM.lat1-la)*sy, lo:x=>UM.lon0+x/sx/UM_KX, la:y=>UM.lat1-y/sy}; }
+function umContours(g,levels,W,H,P,up){ // 細かくした格子で等値線（marching squares）
+  const nx=(UM_NX-1)*up+1, ny=(UM_NY-1)*up+1, f=new Float32Array(nx*ny);
+  for(let j=0;j<ny;j++) for(let i=0;i<nx;i++) f[j*nx+i]=umAt(g,UM.lon0+i*UM.step/up,UM.lat1-j*UM.step/up);
+  const X=i=>P.x(UM.lon0+i*UM.step/up), Y=j=>P.y(UM.lat1-j*UM.step/up), out={};
+  for(const L of levels){ const seg=[];
+    for(let j=0;j<ny-1;j++) for(let i=0;i<nx-1;i++){
+      const a=f[j*nx+i], b=f[j*nx+i+1], c=f[(j+1)*nx+i+1], d=f[(j+1)*nx+i]; if(isNaN(a+b+c+d)) continue;
+      const k=(a>L?8:0)|(b>L?4:0)|(c>L?2:0)|(d>L?1:0); if(k===0||k===15) continue;
+      const t=(p,q)=>(L-p)/(q-p);
+      const T=[X(i+t(a,b)),Y(j)], R=[X(i+1),Y(j+t(b,c))], B=[X(i+t(d,c)),Y(j+1)], Lf=[X(i),Y(j+t(a,d))];
+      const m={1:[[Lf,B]],2:[[B,R]],3:[[Lf,R]],4:[[T,R]],5:[[Lf,T],[B,R]],6:[[T,B]],7:[[Lf,T]],8:[[Lf,T]],9:[[T,B]],10:[[T,R],[Lf,B]],11:[[T,R]],12:[[Lf,R]],13:[[B,R]],14:[[Lf,B]]}[k];
+      m.forEach(s2=>seg.push(s2));
+    }
+    out[L]=seg; }
+  return out;
+}
+function umDraw(){
+  const d=umData[umModel], cv=$("umcv"); if(!d||!cv) return;
+  const lv=UM_LEV[umLev], [TA,ZA]=d.f[umLev], ti=umIdx;
+  const W=cv.clientWidth||600, H=Math.round(W*(UM.lat1-UM.lat0)/((UM.lon1-UM.lon0)*UM_KX)), dpr=Math.min(2,window.devicePixelRatio||1);
+  cv.width=W*dpr; cv.height=H*dpr; cv.style.height=H+"px";
+  const g=cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  const P=umProj(W,H), T=umGrid(TA,ti), Z=umGrid(ZA,ti);
+  // 塗り（2画素ごと）
+  const st=2, img=g.createImageData(Math.ceil(W/st),Math.ceil(H/st));
+  for(let y=0;y<img.height;y++) for(let x=0;x<img.width;x++){ const t=umAt(T,P.lo(x*st+1),P.la(y*st+1)); const c=isNaN(t)?[200,200,200]:umColor(t), o=(y*img.width+x)*4; img.data[o]=c[0];img.data[o+1]=c[1];img.data[o+2]=c[2];img.data[o+3]=255; }
+  const tmp=document.createElement("canvas"); tmp.width=img.width; tmp.height=img.height; tmp.getContext("2d").putImageData(img,0,0);
+  g.imageSmoothingEnabled=true; g.drawImage(tmp,0,0,W,H);
+  // 海岸線
+  g.strokeStyle="rgba(20,20,20,.85)"; g.lineWidth=0.8; g.beginPath();
+  COAST.forEach(a=>{ let x=0,y=0; for(let i=0;i<a.length;i+=2){ x+=a[i]; y+=a[i+1]; const px=P.x(x/10), py=P.y(y/10); i?g.lineTo(px,py):g.moveTo(px,py); } }); g.stroke();
+  // 気温の等値線（4℃ごと、目安の気温は太く）
+  const tl=[]; for(let t=-44;t<=28;t+=4) tl.push(t); lv.key.forEach(k=>{ if(tl.indexOf(k)<0) tl.push(k); });
+  const TC=umContours(T,tl,W,H,P,3);
+  tl.forEach(L=>{ const key=lv.key.indexOf(L)>=0; g.strokeStyle=key?"#fff":"rgba(0,0,0,.35)"; g.lineWidth=key?2.4:0.6; g.setLineDash(key?[]:[3,3]); g.beginPath(); TC[L].forEach(([p,q])=>{g.moveTo(p[0],p[1]);g.lineTo(q[0],q[1]);}); g.stroke(); });
+  g.setLineDash([]);
+  // 高度の等値線（白、dam）
+  let zmin=1e9,zmax=-1e9; Z.forEach(v=>{ if(!isNaN(v)){zmin=Math.min(zmin,v);zmax=Math.max(zmax,v);} });
+  const zs=lv.zstep*10, zl=[]; for(let z=Math.ceil(zmin/zs)*zs; z<=zmax; z+=zs) zl.push(z);
+  const ZC=umContours(Z,zl,W,H,P,3);
+  g.strokeStyle="rgba(255,255,255,.75)"; g.lineWidth=1;
+  zl.forEach(L=>{ g.beginPath(); ZC[L].forEach(([p,q])=>{g.moveTo(p[0],p[1]);g.lineTo(q[0],q[1]);}); g.stroke(); });
+  // ラベル（高度は左右2か所、目安の気温は1か所）
+  g.font="10px system-ui,sans-serif"; g.textAlign="center"; g.textBaseline="middle";
+  const lab=(segs,txt,xf,fg,bg)=>{ let best=null,bd=1e9; segs.forEach(([p,q])=>{ const dd=Math.abs((p[0]+q[0])/2-W*xf); if(dd<bd){bd=dd;best=[(p[0]+q[0])/2,(p[1]+q[1])/2];} }); if(!best||bd>W*0.08) return;
+    const w=g.measureText(txt).width+6; g.fillStyle=bg; g.fillRect(best[0]-w/2,best[1]-7,w,14); g.fillStyle=fg; g.fillText(txt,best[0],best[1]); };
+  zl.forEach(L=>{ [0.12,0.62].forEach(xf=>lab(ZC[L],String(Math.round(L/10)),xf,"#222","rgba(255,255,255,.8)")); });
+  lv.key.forEach((L,i)=>lab(TC[L],L+"℃",i?0.42:0.85,"#fff","rgba(0,0,0,.6)"));
+  // 目印
+  [["白馬",36.70,137.84],["ニセコ",42.86,140.69]].forEach(([n,la,lo])=>{ const x=P.x(lo), y=P.y(la), t=umAt(T,lo,la);
+    g.fillStyle="#111"; g.beginPath(); g.arc(x,y,3.5,0,7); g.fill(); g.fillStyle="#fff"; g.beginPath(); g.arc(x,y,2,0,7); g.fill();
+    const txt=n+" "+(isNaN(t)?"—":Math.round(t)+"℃"); g.font="bold 11px system-ui,sans-serif"; g.textAlign="left"; const w=g.measureText(txt).width+8;
+    g.fillStyle="rgba(0,0,0,.65)"; g.fillRect(x+6,y-8,w,16); g.fillStyle="#fff"; g.fillText(txt,x+10,y); });
+  g.textAlign="center";
+  // 時刻
+  const tt=d.time[ti], dt=new Date(tt+":00+09:00");
+  $("umtime").textContent=(dt.getMonth()+1)+"/"+dt.getDate()+"("+WD[dt.getDay()]+") "+dt.getHours()+"時";
+  $("umslider").value=ti;
+}
+function umLegend(){
+  const lv=UM_LEV[umLev], a=[]; const lo=umLev==="p850"?-36:-48, hi=umLev==="p850"?24:-8;
+  for(let t=lo;t<=hi;t+=4){ const c=umColor(t+1); a.push('<span style="background:rgb('+c.join(",")+')">'+t+'</span>'); }
+  $("umleg").innerHTML=a.join("");
+}
+async function renderUmap(){
+  $("umlev").innerHTML=Object.entries(UM_LEV).map(([k,v])=>'<button type="button" class="btn'+(k===umLev?" on":"")+'" data-umlev="'+k+'">'+v.lab+'</button>').join("")+
+    Object.entries(UM_MODELS).map(([k,v])=>'<button type="button" class="btn'+(k===umModel?" on":"")+'" data-ummodel="'+k+'">'+v+'</button>').join("");
+  $("umnote").textContent=UM_LEV[umLev].note; umLegend();
+  let d; try{ if(!umData[umModel]) $("umtime").textContent="読み込み中…"; d=await umLoad(umModel); }
+  catch(e){ $("umtime").textContent="取得できませんでした"; $("umsrc").textContent="上空のデータを取得できませんでした（"+e.message+"）。"; return; }
+  const sl=$("umslider"); sl.max=d.time.length-1;
+  if(umIdx==null){ const now=Date.now(); let bi=0,bd=1e15; d.time.forEach((t,i)=>{ const x=Math.abs(new Date(t+":00+09:00").getTime()-now); if(x<bd){bd=x;bi=i;} }); umIdx=bi; }
+  umIdx=Math.min(umIdx,d.time.length-1);
+  $("umsrc").textContent="データ：Open-Meteo（"+UM_MODELS[umModel]+"）、3度ごとの格子を補間。白い細線は高度（dam＝10m単位）、太い白線は目安の気温、黒い点線は4℃ごとの気温。地図：Natural Earth。";
+  umDraw();
+}
+$("umlev").addEventListener("click",e=>{ const a=e.target.closest("[data-umlev]"), b=e.target.closest("[data-ummodel]");
+  if(a){ umLev=a.dataset.umlev; store.set("umlev2",umLev); renderUmap(); } if(b){ umModel=b.dataset.ummodel; store.set("ummodel",umModel); renderUmap(); } });
+$("umslider").addEventListener("input",e=>{ umIdx=+e.target.value; umDraw(); });
+$("umprev").addEventListener("click",()=>{ if(umIdx>0){umIdx--;umDraw();} });
+$("umnext").addEventListener("click",()=>{ const d=umData[umModel]; if(d&&umIdx<d.time.length-1){umIdx++;umDraw();} });
+$("umplay").addEventListener("click",()=>{ if(umPlay){ clearInterval(umPlay); umPlay=null; $("umplay").textContent="再生"; return; }
+  $("umplay").textContent="停止"; umPlay=setInterval(()=>{ const d=umData[umModel]; if(!d) return; umIdx=(umIdx+1)%d.time.length; umDraw(); },700); });
+$("umcv").addEventListener("click",e=>{ const d=umData[umModel]; if(!d) return; const cv=$("umcv"), rc=cv.getBoundingClientRect(), P=umProj(rc.width,rc.height);
+  const x=e.clientX-rc.left, y=e.clientY-rc.top, lo=P.lo(x), la=P.la(y), t=umAt(umGrid(d.f[umLev][0],umIdx),lo,la), tip=$("umtip");
+  tip.hidden=false; tip.style.left=x+"px"; tip.style.top=y+"px"; tip.textContent=(isNaN(t)?"—":Math.round(t)+"℃")+"（北緯"+la.toFixed(1)+"・東経"+lo.toFixed(1)+"）"; clearTimeout(tip._t); tip._t=setTimeout(()=>tip.hidden=true,3000); });
+if("IntersectionObserver" in window){ new IntersectionObserver((es,ob)=>{ if(es.some(x=>x.isIntersecting)&&!umSeen){ umSeen=true; ob.disconnect(); renderUmap(); } },{rootMargin:"200px"}).observe($("umap")); }
+else { umSeen=true; renderUmap(); }
+
 function renderHits(){
   const list=[];
   R.filter(r=>favs.has(r.id)&&OV.rows[r.id]).forEach(r=>OV.rows[r.id].days.slice(0,span).forEach((c,i)=>{ if(c.cm!=null) list.push({r,i,c}); }));
@@ -1290,7 +1431,7 @@ $("grid").addEventListener("click",e=>{
   const th=e.target.closest("th.dh"); if(th){ sortDay=+th.dataset.i; renderGrid(); return; }
   pick(e);
 });
-let rt; window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{ sizeEmbeds();const r=R.find(x=>x.id===selected); if(r&&DET[r.id]) drawChart(DET[r.id])},150)});
+let rt; window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{ sizeEmbeds(); umDraw();const r=R.find(x=>x.id===selected); if(r&&DET[r.id]) drawChart(DET[r.id])},150)});
 start(false);
 </script>
 </body>
