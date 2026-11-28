@@ -64,6 +64,19 @@ button,select,input{font:inherit;color:inherit}
 .banner{background:var(--surface2);border-left:4px solid var(--warn);padding:8px 12px;border-radius:6px;font-size:13px}
 .banner.err{border-left-color:var(--bad)}
 /* 当たり日 */
+.recctl .views{margin-bottom:6px}
+.recs{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:6px}
+.rec{border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;background:var(--surface);text-align:left;display:flex;flex-direction:column;gap:4px;color:inherit;font:inherit}
+.rec:hover{border-color:var(--accent)}
+.rec .top{display:flex;align-items:baseline;gap:8px}.rec .rk{font-size:12px;color:var(--muted);min-width:18px}
+.rec .n{font-weight:700;flex:1}.rec .sc{font-family:var(--f-num);font-size:26px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.rec .sc span{font-size:12px;font-weight:500;color:var(--muted);margin-left:1px}
+.rec .bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}.rec .bar i{display:block;height:100%;background:var(--accent)}
+.rec .sub{font-size:12px;color:var(--muted)}
+details.recall{margin-top:10px;font-size:13px}details.recall summary{cursor:pointer}
+table.rect{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;font-variant-numeric:tabular-nums}
+table.rect th,table.rect td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table.rect th{font-weight:500;color:var(--muted)}table.rect .l{text-align:left}table.rect tr[data-id]{cursor:pointer}
 .hits{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
 .hit{border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;background:var(--surface);text-align:left;display:flex;flex-direction:column;gap:2px}
 .hit:hover{border-color:var(--accent)}
@@ -219,7 +232,7 @@ footer a{color:var(--accent)}
 <div class="wrap">
   <header class="top">
     <h1><svg class="logo" viewBox="0 0 547.23 176.4" role="img" aria-label="ユキヨミ"><g transform="translate(38.2,38.2)"><g fill="none" stroke="currentColor" stroke-width="9.02" stroke-linecap="butt" stroke-linejoin="miter"><g transform="translate(0,0)"><path d="M23.6,38.2 H67.8 V76.4"/><line x1="10.6" y1="76.4" x2="89.4" y2="76.4"/></g><g transform="translate(123.61,0)"><line x1="14.6" y1="38.2" x2="85.4" y2="38.2"/><line x1="8.6" y1="61.8" x2="91.4" y2="61.8"/><line x1="42.2" y1="10.6" x2="57.8" y2="89.4"/></g><g transform="translate(247.22,0)"><path d="M19.6,23.6 H76.4 V76.4 H19.6"/><line x1="27.6" y1="50.0" x2="76.4" y2="50.0"/></g><g transform="translate(370.83,0)"><line x1="31.5" y1="17.8" x2="68.5" y2="27.4" stroke="#6fa9ee"/><line x1="26.5" y1="41.9" x2="73.5" y2="54.1" stroke="#3a78dd"/><line x1="20.1" y1="70.6" x2="79.9" y2="86.2" stroke="#3b3fc4"/></g></g></g></svg><small>国内スキー場の降雪予報 ・ 4つの気象モデルを比べて読む</small></h1>
-    <div class="meta"><span id="updated">読み込み中…</span><span id="ver" style="opacity:.6">v37</span><button class="btn" id="reload" type="button">最新に更新</button><button class="btn" id="camtoggle" type="button">ライブカメラ一覧</button></div>
+    <div class="meta"><span id="updated">読み込み中…</span><span id="ver" style="opacity:.6">v38</span><button class="btn" id="reload" type="button">最新に更新</button><button class="btn" id="camtoggle" type="button">ライブカメラ一覧</button></div>
   </header>
 
   <div id="msg"></div>
@@ -230,6 +243,17 @@ footer a{color:var(--accent)}
     <p class="askp" id="camnote"></p>
     <p class="askbtn"><a class="btn" id="shotbtn" href="https://storage.cloud.google.com/yukiyomi-cam-msmttng-shots/index.html" target="_blank" rel="noopener nofollow">撮影画像（自分用）</a></p>
     <div id="cambody"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-rec">
+    <h2 id="h-rec">おすすめスキー場</h2>
+    <p class="askp">新雪・風・天気・雪質・雨をまとめて点数にしました。押すと詳しい予報を開きます。</p>
+    <div class="recctl">
+      <div class="views" id="recreg"></div>
+      <div class="views" id="recday"></div>
+      <div class="views" id="recwin"></div>
+    </div>
+    <div id="recbody"><p class="askp">読み込み中…</p></div>
   </section>
 
   <section class="panel" aria-labelledby="h-hits">
@@ -475,7 +499,7 @@ function windVec(s,i,z){ // 標高 z 付近の風ベクトル [東向き成分, 
 function pack(h,m){ const g=v=>{const a=series(h,v,m); return valid(a)?a:null};
   const T=g("temperature_2m"), P=g("precipitation"); if(!T||!P) return null;
   return {m,T,P,H:g("relative_humidity_2m"),T9:g("temperature_925hPa"),T8:g("temperature_850hPa"),T7:g("temperature_700hPa"),
-    W9:g("wind_speed_925hPa"),W8:g("wind_speed_850hPa"),W7:g("wind_speed_700hPa"),D9:g("wind_direction_925hPa"),D8:g("wind_direction_850hPa"),D7:g("wind_direction_700hPa"),G:g("wind_gusts_10m"),F:g("freezing_level_height")};
+    W9:g("wind_speed_925hPa"),W8:g("wind_speed_850hPa"),W7:g("wind_speed_700hPa"),D9:g("wind_direction_925hPa"),D8:g("wind_direction_850hPa"),D7:g("wind_direction_700hPa"),G:g("wind_gusts_10m"),F:g("freezing_level_height"),C:g("cloud_cover")};
 }
 function series(h,v,m){ return h[v+"_"+m] || h[v] || null; }
 function valid(a){ return !!a && a.some(x=>x!=null); }
@@ -912,6 +936,89 @@ async function renderVerify(r){
 /* ---------- 描画 ---------- */
 const $ = id=>document.getElementById(id);
 function showMsg(html,err){ $("msg").innerHTML = html?'<div class="banner'+(err?" err":"")+'">'+html+"</div>":""; }
+/* ---------- おすすめスキー場（新雪・風・天気・雪質・雨を点数に） ---------- */
+let REC = {}, recReg = store.get("recreg", null), recDay = null, recWin = store.get("recwin","am");
+const REC_WIN = {am:[8,12,"午前（8〜12時）"], day:[8,16,"1日（8〜16時）"]};
+async function loadRec(reg){
+  const c = REC[reg]; if(c && Date.now()-c.at < CACHE_MIN*60e3) return c;
+  const list = R.filter(r=>r.region===reg), rows = {};
+  let time = null;
+  for(let k=0;k<list.length;k+=20){
+    const part = list.slice(k,k+20);
+    let arr;
+    if(MOCK) arr = part.map(r=>mockHourly(r,MODELS.map(m=>m[0]),R.indexOf(r)));
+    else arr = await getJSON(API+"?latitude="+part.map(r=>r.lat).join(",")+"&longitude="+part.map(r=>r.lon).join(",")+"&elevation="+part.map(r=>r.mid).join(",")+
+      "&hourly=temperature_2m,precipitation,relative_humidity_2m,wind_gusts_10m,cloud_cover,temperature_925hPa,temperature_850hPa,temperature_700hPa,wind_speed_925hPa,wind_speed_850hPa,wind_speed_700hPa&models="+MODELS.map(m=>m[0]).join(",")+
+      "&forecast_days=3&past_days=2&timezone=Asia%2FTokyo&wind_speed_unit=ms");
+    if(arr.length!==part.length) throw new Error("スキー場の数と応答の数が合いません");
+    part.forEach((r,i)=>{ const h=arr[i].hourly; time=time||h.time; rows[r.id]={r, time:h.time, ms: MODELS.map(([m])=>pack(h,m)).filter(Boolean)}; });
+  }
+  return REC[reg] = {at:Date.now(), rows, time};
+}
+function recScore(x,date,win){
+  const {r,time,ms}=x; if(!ms.length) return null;
+  const h0=time.indexOf(date+"T"+String(win[0]).padStart(2,"0")+":00"); if(h0<14) return null;
+  const W=[]; for(let i=h0;i<h0+(win[1]-win[0]);i++) if(i<time.length) W.push(i);
+  const N=[]; for(let i=h0-14;i<h0;i++) N.push(i);          // 前日18時〜朝8時
+  const P=[]; for(let i=h0-62;i<h0-14;i++) if(i>=0) P.push(i); // その前の2日
+  const sum=(idx,e)=>median(ms.map(s=>idx.reduce((a,i)=>a+(s.P[i]==null||s.T[i]==null?0:snowE(s,i,r,e)),0)));
+  const both=idx=>((sum(idx,r.top)||0)+(sum(idx,r.mid)||0))/2;
+  const night=both(N), dayS=both(W), recent=sum(P,r.top)||0, fresh=night+0.6*dayS;
+  const hv=(f)=>W.map(i=>median(ms.map(s=>f(s,i)))).filter(v=>v!=null);
+  const ws=hv((s,i)=>windAt(s,i,r.top)), gs=hv((s,i)=>s.G?s.G[i]:null), cs=hv((s,i)=>s.C?s.C[i]:null), ps=hv((s,i)=>s.P[i]), ts=hv((s,i)=>tE(s,i,r,r.top));
+  const wmax=ws.length?Math.max(...ws):null, gmax=gs.length?Math.max(...gs):null, cloud=cs.length?cs.reduce((a,b)=>a+b,0)/cs.length:null;
+  const wetH=ps.filter(v=>v>=0.3).length, tmax=ts.length?Math.max(...ts):null;
+  const rainAt=(idx,e)=>median(ms.map(s=>idx.reduce((a,i)=>{const f=fracE(s,i,r,e); return a+(s.P[i]>0&&f!=null?s.P[i]*(1-f):0)},0)))||0;
+  const rainB=rainAt(N.concat(W),r.base), rainT=rainAt(N.concat(W),r.top);
+  let w=0,sw=0; N.concat(W).forEach(i=>{ const sn=median(ms.map(s=>s.P[i]==null||s.T[i]==null?null:snowE(s,i,r,r.top)))||0, t=median(ms.map(s=>tE(s,i,r,r.top))); if(sn>0&&t!=null){w+=sn;sw+=sn*t;} });
+  const q=quality(w>0.3?sw/w:null);
+  // 点数
+  const why=[]; let sc=30;
+  sc += 45*(1-Math.exp(-fresh/18));
+  sc += 10*(1-Math.exp(-recent/40));
+  why.push([fresh>=15?"good":fresh>=5?"":"warn", fresh<1?"新雪なし":"新雪 "+r0(fresh)+"cm（夜"+r0(night)+"・日中"+r0(dayS)+"）"]);
+  if(gmax!=null){ let pen = gmax<=8?0 : gmax<=12?(gmax-8)*2 : gmax<=18?8+(gmax-12)*3 : Math.min(45,26+(gmax-18)*4);
+    if(wmax!=null&&wmax>14) pen+=(wmax-14)*2; sc-=pen;
+    why.push(gmax>=18||(wmax!=null&&wmax>=20)?["bad","強風・運休注意（突風"+r0(gmax)+"m/s）"] : gmax>=12?["warn","風やや強い（突風"+r0(gmax)+"m/s）"] : gmax>8?["","風ふつう（突風"+r0(gmax)+"m/s）"] : ["good","風おだやか（突風"+r0(gmax)+"m/s）"]); }
+  let wx;
+  if(wetH>=W.length/2) { wx = rainT>=1?["bad","雨"]:["",dayS>=8?"雪が降り続く":"雪"]; if(dayS>=8) sc-=6; }
+  else if(cloud!=null&&cloud<35&&wetH===0){ wx=["good","晴れ"]; sc+=10; }
+  else if(cloud!=null&&cloud<65){ wx=["good","晴れ間あり"]; sc+=5; }
+  else if(cloud!=null) wx=["","くもり"+(wetH?"・ときどき雪":"")];
+  if(wx) why.push(wx);
+  if(fresh>=3){ const qb={"極上ドライ":8,"ドライ":6,"やや重め":0,"湿雪":-8}[q[0]]; if(qb!=null){ sc+=qb; why.push([q[1],q[0]]); } }
+  if(rainT>=1){ sc-=Math.min(30,3*rainT); why.push(["bad","山頂でも雨 "+r0(rainT)+"mm"]); }
+  else if(rainB>=1){ sc-=Math.min(20,2*rainB); why.push(["warn","山麓で雨 "+r0(rainB)+"mm"]); }
+  if(tmax!=null&&tmax>=3){ sc-=5; why.push(["warn","気温が上がり雪がゆるむ（山頂"+r0(tmax)+"℃）"]); }
+  return {r, sc:Math.max(0,Math.min(100,Math.round(sc))), fresh, night, dayS, recent, gmax, wmax, cloud, tmax, q, rainB, rainT, why};
+}
+function recDates(){ const t=new Date(), out=[]; for(let k=0;k<3;k++){ const d=new Date(t.getFullYear(),t.getMonth(),t.getDate()+k); out.push(d.toLocaleDateString("sv-SE")); } return out; }
+async function renderRec(){
+  const regs=[...new Set(R.map(r=>r.region))];
+  if(!recReg||regs.indexOf(recReg)<0) recReg = regs.indexOf(view)>=0 ? view : regs[0];
+  const ds=recDates();
+  if(recDay==null) recDay = new Date().getHours()>=13 ? 1 : 0;   // 昼過ぎなら明日を出す
+  $("recreg").innerHTML=regs.map(v=>'<button type="button" class="btn'+(v===recReg?" on":"")+'" data-rreg="'+v+'">'+v+'</button>').join("");
+  $("recday").innerHTML=ds.map((d,i)=>'<button type="button" class="btn'+(i===recDay?" on":"")+'" data-rday="'+i+'">'+fmtDay(d,i)+'</button>').join("");
+  $("recwin").innerHTML=Object.entries(REC_WIN).map(([k,v])=>'<button type="button" class="btn'+(k===recWin?" on":"")+'" data-rwin="'+k+'">'+v[2]+'</button>').join("");
+  let data;
+  try{ if(!REC[recReg]) $("recbody").innerHTML='<p class="askp">'+esc(recReg)+'の全スキー場の予報を集めています…</p>'; data=await loadRec(recReg); }
+  catch(e){ $("recbody").innerHTML='<p class="askp">おすすめ用のデータを取得できませんでした（'+esc(e.message)+'）。「最新に更新」で再試行してください。</p>'; return; }
+  const win=REC_WIN[recWin], res=Object.values(data.rows).map(x=>recScore(x,ds[recDay],win)).filter(Boolean).sort((a,b)=>b.sc-a.sc);
+  if(!res.length){ $("recbody").innerHTML='<p class="askp">この日の予報がまだありません。</p>'; return; }
+  const pills=x=>'<span class="pills">'+x.why.map(w=>'<span class="pill '+w[0]+'">'+esc(w[1])+'</span>').join("")+'</span>';
+  const card=(x,i)=>'<button type="button" class="rec" data-id="'+x.r.id+'"><span class="top"><span class="rk">'+(i+1)+'</span><span class="n">'+esc(x.r.name)+'</span><span class="sc">'+x.sc+'<span>点</span></span></span>'+
+    '<span class="bar"><i style="width:'+x.sc+'%"></i></span>'+pills(x)+'<span class="sub">'+esc(x.r.area)+' ・ 山頂 '+x.r.top+'m'+(x.recent>=5?' ・ その前2日の雪 '+r0(x.recent)+'cm':'')+'</span></button>';
+  $("recbody").innerHTML='<div class="recs">'+res.slice(0,5).map(card).join("")+'</div>'+
+    '<details class="recall"><summary>全'+res.length+'か所の点数を見る</summary><div class="scroll"><table class="rect"><thead><tr><th class="l">スキー場</th><th>点</th><th>新雪</th><th>突風</th><th>雲</th><th>雪質</th><th>雨(麓)</th></tr></thead><tbody>'+
+    res.map(x=>'<tr data-id="'+x.r.id+'"><td class="l">'+esc(x.r.name)+'</td><td><b>'+x.sc+'</b></td><td>'+r0(x.fresh)+'cm</td><td>'+(x.gmax==null?"—":r0(x.gmax)+"m/s")+'</td><td>'+(x.cloud==null?"—":r0(x.cloud)+"%")+'</td><td>'+(x.fresh>=3?x.q[0]:"—")+'</td><td>'+(x.rainB>=0.5?r0(x.rainB)+"mm":"—")+'</td></tr>').join("")+'</tbody></table></div></details>'+
+    '<p class="askp">新雪は前日18時から'+win[0]+'時までの雪と、'+win[2].replace(/（.*/,"")+'の雪（6割で計算）を、山頂と中腹で平均したものです。風・雲・雨は'+win[2]+'の予報です。営業状況や実際の積雪は、各スキー場の公式情報で確認してください。</p>';
+}
+$("recreg").addEventListener("click",e=>{const b=e.target.closest("[data-rreg]"); if(!b) return; recReg=b.dataset.rreg; store.set("recreg",recReg); renderRec();});
+$("recday").addEventListener("click",e=>{const b=e.target.closest("[data-rday]"); if(!b) return; recDay=+b.dataset.rday; renderRec();});
+$("recwin").addEventListener("click",e=>{const b=e.target.closest("[data-rwin]"); if(!b) return; recWin=b.dataset.rwin; store.set("recwin",recWin); renderRec();});
+$("recbody").addEventListener("click",pick);
+
 function renderHits(){
   const list=[];
   R.filter(r=>favs.has(r.id)&&OV.rows[r.id]).forEach(r=>OV.rows[r.id].days.slice(0,span).forEach((c,i)=>{ if(c.cm!=null) list.push({r,i,c}); }));
@@ -1164,6 +1271,8 @@ async function start(force){
   try{ await loadOverview(R.filter(r=>favs.has(r.id)).concat(viewRows()).filter((r,i,a)=>a.indexOf(r)===i),force); }
   catch(e){ $("updated").textContent="取得失敗"; showMsg("予報データを取得できませんでした（"+esc(e.message)+"）。通信を確認して「最新に更新」を押してください。",true); return; }
   renderAll(); renderDetail(force,false);
+  if(force) REC={};
+  renderRec();
 }
 $("th").value = threshold;
 $("reload").addEventListener("click",()=>{DET={};start(true)});
