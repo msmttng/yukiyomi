@@ -969,7 +969,7 @@ function recScore(x,date,win){
   const wmax=ws.length?Math.max(...ws):null, gmax=gs.length?Math.max(...gs):null, cloud=cs.length?cs.reduce((a,b)=>a+b,0)/cs.length:null;
   const wetH=ps.filter(v=>v>=0.3).length, tmax=ts.length?Math.max(...ts):null;
   const rainAt=(idx,e)=>median(ms.map(s=>idx.reduce((a,i)=>{const f=fracE(s,i,r,e); return a+(s.P[i]>0&&f!=null?s.P[i]*(1-f):0)},0)))||0;
-  const rainB=rainAt(N.concat(W),r.base), rainT=rainAt(N.concat(W),r.top);
+  const rainB=rainAt(W,r.base), rainT=rainAt(W,r.top), rainBN=rainAt(N,r.base), rainTN=rainAt(N,r.top);   // 滑る時間帯の雨と、前夜の雨
   let w=0,sw=0; N.concat(W).forEach(i=>{ const sn=median(ms.map(s=>s.P[i]==null||s.T[i]==null?null:snowE(s,i,r,r.top)))||0, t=median(ms.map(s=>tE(s,i,r,r.top))); if(sn>0&&t!=null){w+=sn;sw+=sn*t;} });
   const q=quality(w>0.3?sw/w:null);
   // 点数
@@ -989,6 +989,8 @@ function recScore(x,date,win){
   if(fresh>=3){ const qb={"極上ドライ":8,"ドライ":6,"やや重め":0,"湿雪":-8}[q[0]]; if(qb!=null){ sc+=qb; why.push([q[1],q[0]]); } }
   if(rainT>=1){ sc-=Math.min(30,3*rainT); why.push(["bad","山頂でも雨 "+r0(rainT)+"mm"]); }
   else if(rainB>=1){ sc-=Math.min(20,2*rainB); why.push(["warn","山麓で雨 "+r0(rainB)+"mm"]); }
+  if(rainTN>=2){ sc-=Math.min(15,rainTN); why.push(["warn","夜に山頂で雨 "+r0(rainTN)+"mm（雪面が固まるかも）"]); }
+  else if(rainBN>=3){ sc-=Math.min(6,0.25*rainBN); why.push(["","夜のうち山麓は雨"]); }
   if(tmax!=null&&tmax>=3){ sc-=5; why.push(["warn","気温が上がり雪がゆるむ（山頂"+r0(tmax)+"℃）"]); }
   return {r, sc:Math.max(0,Math.min(100,Math.round(sc))), fresh, night, dayS, recent, gmax, wmax, cloud, tmax, q, rainB, rainT, why};
 }
